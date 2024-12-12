@@ -1,0 +1,4 @@
+alembic>=1.7.7
+psycopg2-binary>=2.9.3
+SQLAlchemy>=1.4.36
+asyncpg>=0.25.0
