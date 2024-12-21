@@ -1,18 +1,18 @@
 from datetime import datetime
 from typing import Optional
+from enum import Enum
 from sqlalchemy import (
     Column, 
     Integer, 
     String, 
     Text, 
-    Float,  # Added Float import
+    Float,
     DateTime, 
     ForeignKey, 
     JSON, 
-    Enum as SQLEnum
+    UniqueConstraint
 )
 from sqlalchemy.orm import relationship, declarative_base
-from enum import Enum
 
 Base = declarative_base()
 
@@ -22,43 +22,51 @@ class ConversationStatus(str, Enum):
     FAILED = "failed"
     TIMEOUT = "timeout"
 
-class ServiceType(str, Enum):
-    USER = "user"
-    SYSTEM = "system"
-    ATLAS = "atlas"
-    NOVA = "nova"
-    SAGE = "sage"
-    ECHO = "echo"
-    PIXEL = "pixel"
-    QUANTUM = "quantum"
-
 class Conversation(Base):
     __tablename__ = "conversation_logs"
+    
     id = Column(Integer, primary_key=True, index=True)
     started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     ended_at = Column(DateTime, nullable=True)
-    initial_query = Column(String)  # Match the actual column name
-    status = Column(String)  # Simple string column as in DB
-    messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan")
+    initial_query = Column(String)
+    status = Column(String)
+    
+    # Define the relationship to Message
+    messages = relationship("Message", back_populates="conversation")
 
 class Message(Base):
     __tablename__ = "message_logs"
+    
     id = Column(Integer, primary_key=True, index=True)
     conversation_id = Column(Integer, ForeignKey("conversation_logs.id"))
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)  # Use timestamp instead of created_at
-    message_type = Column(String)  # Simple string instead of enum
-    source = Column(String)  # Simple string instead of enum
-    destination = Column(String)  # Simple string instead of enum
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    message_type = Column(String)
+    source = Column(String)
+    destination = Column(String)
     content = Column(String)
     correlation_id = Column(String)
     context = Column(JSON, nullable=True)
     processing_details = Column(JSON, nullable=True)
     parent_message_id = Column(Integer, ForeignKey("message_logs.id"), nullable=True)
+    
+    # Define the relationship to Conversation
     conversation = relationship("Conversation", back_populates="messages")
-    metrics = relationship("ProcessingMetrics", back_populates="message", cascade="all, delete-orphan")
+    
+    # Add unique constraint
+    __table_args__ = (
+        UniqueConstraint(
+            'conversation_id', 
+            'message_type', 
+            'source', 
+            'destination', 
+            'correlation_id',
+            name='uq_message_identifier'
+        ),
+    )
 
 class ProcessingMetrics(Base):
     __tablename__ = "processing_metrics"
+    
     id = Column(Integer, primary_key=True, index=True)
     message_id = Column(Integer, ForeignKey("message_logs.id"))
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -67,4 +75,10 @@ class ProcessingMetrics(Base):
     tokens_used = Column(Integer)
     processing_time = Column(Float)
     model_parameters = Column(JSON, nullable=True)
-    message = relationship("Message", back_populates="metrics")
+    
+    # Define the relationship to Message
+    message = relationship("Message")
+
+def get_all_models():
+    """Return all model classes for verification"""
+    return [Conversation, Message, ProcessingMetrics]

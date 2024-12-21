@@ -3,6 +3,7 @@ import asyncio
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.models import Conversation, Message, ProcessingMetrics, ConversationStatus
 from core.messaging.types import MessageType
@@ -35,31 +36,47 @@ class SystemLogger:
     @staticmethod
     async def log_message(
         conversation_id: int,
-        message_type: MessageType,
+        message_type: str,
         source: str,
         destination: str,
         content: str,
         correlation_id: str,
-        context: Dict[str, Any] = None,
-        parent_message_id: Optional[int] = None
+        context: Dict[str, Any] = None
     ) -> int:
         """Log a message and return its ID"""
         async with get_db_session() as session:
-            message = Message(
-                conversation_id=conversation_id,
-                timestamp=datetime.utcnow(),
-                message_type=message_type.value if isinstance(message_type, MessageType) else str(message_type),
-                source=source,
-                destination=destination,
-                content=content,
-                correlation_id=correlation_id,
-                context=context or {},
-                processing_details={},
-                parent_message_id=parent_message_id
-            )
-            session.add(message)
-            await session.flush()
-            return message.id
+            try:
+                message = Message(
+                    conversation_id=conversation_id,
+                    timestamp=datetime.utcnow(),
+                    message_type=message_type,
+                    source=source,
+                    destination=destination,
+                    content=content,
+                    correlation_id=correlation_id,
+                    context=context or {},
+                    processing_details={}
+                )
+                session.add(message)
+                await session.flush()
+                await session.commit()
+                return message.id
+            except IntegrityError:
+                await session.rollback()
+                # Get existing message
+                existing = await session.execute(
+                    select(Message).where(
+                        Message.conversation_id == conversation_id,
+                        Message.message_type == message_type,
+                        Message.source == source,
+                        Message.destination == destination,
+                        Message.correlation_id == correlation_id
+                    )
+                )
+                existing_message = existing.scalar_one_or_none()
+                if existing_message:
+                    return existing_message.id
+                raise
 
     @staticmethod
     async def log_processing_metrics(

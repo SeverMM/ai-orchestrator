@@ -31,314 +31,202 @@ class AtlasService(BaseService):
                 logger.error(f"Error handling query: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
+    # Atlas service implementation
+    async def process_message(self, message_data: Dict[str, Any]):
+        """Process messages based on type"""
+        try:
+            message = Message(**message_data)
+            logger.info(f"Processing message type: {message.type} from {message.source}")
+            
+            # Log received message
+            await SystemLogger.log_message(
+                conversation_id=message.conversation_id,
+                message_type=message.type,
+                source=message.source,
+                destination="atlas",
+                content=message.content,
+                correlation_id=message.correlation_id,
+                context=message.context
+            )
+            
+            if message.type == MessageType.QUERY:
+                await self.handle_user_query(message.content)
+            elif message.type == MessageType.RESPONSE:
+                await self._handle_response(message)
+            elif message.type == MessageType.ERROR:
+                await self._handle_error(message)
+            else:
+                logger.warning(f"Unhandled message type: {message.type}")
+                
+        except Exception as e:
+            logger.error(f"Error processing message: {e}")
+
     async def handle_user_query(self, query: str) -> Dict[str, Any]:
+        """Handle initial user query"""
         try:
             correlation_id = f"query_{hash(query + str(time.time()))}"
             conversation_id = await SystemLogger.start_conversation(query)
-            start_time = time.time()
             
+            # Initialize conversation tracking
             self.conversations[correlation_id] = {
                 "query": query,
                 "conversation_id": conversation_id,
                 "initial_analysis": None,
-                "reflections": [],
                 "branch_responses": {},
                 "status": "processing"
             }
-
-            # Initial Analysis
-            initial_analysis = await self.query_model(self.prompts.initial_analysis(query))
+            
+            # Generate initial analysis
+            initial_analysis = await self.query_model(
+                self.prompts.initial_analysis(query)
+            )
+            
             initial_content = initial_analysis["choices"][0]["message"]["content"]
             self.conversations[correlation_id]["initial_analysis"] = initial_content
-
-            # Log initial analysis message
-            message_id = await SystemLogger.log_message(
-                conversation_id=conversation_id,
-                message_type="analysis",
-                source="atlas",
-                destination="user",
-                content=initial_content,
-                correlation_id=correlation_id
-            )
-
-            # Log metrics
-            await SystemLogger.log_processing_metrics(
-                message_id=message_id,
-                service="atlas",
-                operation_type="initial_analysis",
-                tokens_used=initial_analysis.get("usage", {}).get("total_tokens", 0),
-                processing_time=time.time() - start_time,
-                model_parameters={"type": "initial_analysis"}
-            )
-
-            # Reflection cycle
-            await self._perform_reflection_cycle(correlation_id, initial_content=initial_content)
-
-            # Delegate to branches
-            await self._delegate_to_branches(correlation_id, conversation_id)
-
-            # Wait for responses
-            branch_responses = await self._collect_branch_responses(correlation_id)
-
-            # Final synthesis only if we have responses
-            if branch_responses:
-                final_response = await self._synthesize_responses(correlation_id)
-            else:
-                final_response = "No branch responses received within timeout period."
-
-            # Log final response
+            
+            # Log initial analysis
             await SystemLogger.log_message(
                 conversation_id=conversation_id,
-                message_type="synthesis",
+                message_type='analysis',
                 source="atlas",
-                destination="user",
-                content=final_response,
+                destination="system",
+                content=initial_content,
                 correlation_id=correlation_id,
-                context={"branch_responses": bool(branch_responses)}
+                context={"type": "initial_analysis"}
             )
-
-            response = {
-                "status": "success",
-                "initial_analysis": initial_content,
-                "branch_responses": branch_responses,
-                "final_response": final_response,
-                "reflection_count": len(self.conversations[correlation_id]["reflections"])
+            
+            # Delegate to branches
+            await self._delegate_to_branches(correlation_id, conversation_id)
+            
+            return {
+                "status": "processing",
+                "message": "Query is being processed",
+                "correlation_id": correlation_id
             }
-
-            await SystemLogger.end_conversation(conversation_id, "completed")
-            await self._cleanup_conversation(correlation_id)
-            return response
-
+            
         except Exception as e:
+            logger.error(f"Error handling query: {e}")
             if 'conversation_id' in locals():
                 await SystemLogger.end_conversation(conversation_id, "failed")
-            logger.error(f"Error in query handling: {e}")
             raise
 
-    async def _delegate_to_branches(self, correlation_id: str, conversation_id: int):
-        conversation = self.conversations[correlation_id]
-        
-        for branch in ['nova', 'sage']:
-            try:
-                message = {
-                    'type': 'delegation',
-                    'content': conversation["query"],
-                    'correlation_id': correlation_id,
-                    'conversation_id': conversation_id,
-                    'context': {
-                        'atlas_analysis': conversation["initial_analysis"]
+    async def _handle_response(self, message: Message):
+        """Handle responses from Nova and Sage"""
+        try:
+            conversation = self.conversations.get(message.correlation_id)
+            if not conversation:
+                logger.warning(f"No conversation found for correlation_id: {message.correlation_id}")
+                return
+                
+            # Store branch response
+            conversation["branch_responses"][message.source] = message.content
+            
+            # If we have both responses, synthesize and respond
+            if len(conversation["branch_responses"]) == 2:  # Both Nova and Sage
+                # Generate final synthesis
+                final_analysis = await self.query_model(
+                    self.prompts.final_synthesis(
+                        conversation["query"],
+                        conversation["initial_analysis"],
+                        conversation["branch_responses"].get("nova", "No response from Nova"),
+                        conversation["branch_responses"].get("sage", "No response from Sage")
+                    )
+                )
+                
+                final_content = final_analysis["choices"][0]["message"]["content"]
+                
+                # Log final synthesis
+                await SystemLogger.log_message(
+                    conversation_id=conversation["conversation_id"],
+                    message_type='synthesis',
+                    source="atlas",
+                    destination="user",
+                    content=final_content,
+                    correlation_id=message.correlation_id,
+                    context={
+                        "type": "final_synthesis",
+                        "branches_responded": list(conversation["branch_responses"].keys())
                     }
+                )
+                
+                # Mark conversation as complete
+                await SystemLogger.end_conversation(
+                    conversation["conversation_id"],
+                    "completed"
+                )
+                
+                # Cleanup
+                del self.conversations[message.correlation_id]
+                
+                # Return final response to user
+                return {
+                    "status": "complete",
+                    "response": final_content
                 }
+                
+        except Exception as e:
+            logger.error(f"Error handling response: {e}")
+            if conversation:
+                await SystemLogger.end_conversation(
+                    conversation["conversation_id"],
+                    "failed"
+                )
 
+    async def _delegate_to_branches(self, correlation_id: str, conversation_id: int):
+        """Delegate to Nova and Sage"""
+        try:
+            conversation = self.conversations[correlation_id]
+            
+            for branch in ['nova', 'sage']:
                 # Log delegation
                 await SystemLogger.log_message(
                     conversation_id=conversation_id,
-                    message_type="delegation",
+                    message_type='delegation',
                     source="atlas",
                     destination=branch,
                     content=conversation["query"],
                     correlation_id=correlation_id,
-                    context={'atlas_analysis': conversation["initial_analysis"]}
+                    context={"atlas_analysis": conversation["initial_analysis"]}
                 )
-
-                # Send message
-                await self.messaging.publish(f"{branch}_queue", message)
-                logger.info(f"Delegated to {branch} branch")
-
-            except Exception as e:
-                logger.error(f"Error delegating to {branch}: {e}")
-
-    async def _perform_reflection_cycle(
-        self,
-        correlation_id: str,
-        initial_content: str
-    ):
-        """Perform reflection and critique cycle"""
-        conversation = self.conversations[correlation_id]
-        current_analysis = initial_content
-
-        for depth in range(self.reflection_depth):
-            # Generate reflection
-            reflection = await self.query_model(
-                self.prompts.reflect_on_analysis(current_analysis, depth + 1)
-            )
-            reflection_content = reflection["choices"][0]["message"]["content"]
-
-            # Log reflection
-            reflection_message_id = await SystemLogger.log_message(
-                conversation_id=conversation["conversation_id"],
-                message_type='reflection',
-                source="atlas",
-                destination="system",
-                content=reflection_content,
-                correlation_id=correlation_id,
-                context={
-                    "depth": depth + 1,
-                    "reflection_type": "coordination"
-                }
-            )
-
-            # Log reflection metrics
-            await SystemLogger.log_processing_metrics(
-                message_id=reflection_message_id,
-                service="atlas",
-                operation_type="reflection",
-                tokens_used=reflection.get("usage", {}).get("total_tokens", 0),
-                processing_time=0,
-                model_parameters={"reflection_depth": depth + 1}
-            )
-
-            # Generate critique
-            critique = await self.query_model(
-                self.prompts.critique_analysis(reflection_content)
-            )
-            critique_content = critique["choices"][0]["message"]["content"]
-
-            # Log critique
-            critique_message_id = await SystemLogger.log_message(
-                conversation_id=conversation["conversation_id"],
-                message_type='critique',
-                source="atlas",
-                destination="system",
-                content=critique_content,
-                correlation_id=correlation_id,
-                context={
-                    "depth": depth + 1,
-                    "critique_type": "coordination",
-                    "reflection_id": reflection_message_id
-                }
-            )
-
-            # Log critique metrics
-            await SystemLogger.log_processing_metrics(
-                message_id=critique_message_id,
-                service="atlas",
-                operation_type="critique",
-                tokens_used=critique.get("usage", {}).get("total_tokens", 0),
-                processing_time=0,
-                model_parameters={"reflection_depth": depth + 1}
-            )
-
-            # Store reflection and critique
-            conversation["reflections"].append({
-                "depth": depth + 1,
-                "reflection": reflection_content,
-                "critique": critique_content
-            })
-
-            current_analysis = reflection_content
-
-    async def _delegate_to_branches(self, correlation_id: str, conversation_id: int):
-        """Delegate analysis to Nova and Sage branches"""
-        conversation = self.conversations[correlation_id]
-        
-        for branch in ['nova', 'sage']:
-            try:
-                # Generate branch-specific guidance using prompts
-                branch_guidance = await self.query_model(
-                    self.prompts.branch_specific_guidance(
-                        original_query=conversation["query"],
-                        initial_analysis=conversation["initial_analysis"],
-                        branch=branch
-                    )
+                
+                # Send to branch
+                await self.messaging.publish(
+                    f"{branch}_queue",
+                    Message(
+                        type=MessageType.DELEGATION,
+                        content=conversation["query"],
+                        correlation_id=correlation_id,
+                        source="atlas",
+                        destination=branch,
+                        conversation_id=conversation_id,
+                        context={"atlas_analysis": conversation["initial_analysis"]}
+                    ).dict()
                 )
-                guidance_content = branch_guidance["choices"][0]["message"]["content"]
+                
+        except Exception as e:
+            logger.error(f"Error delegating to branches: {e}")
+            if conversation_id:
+                await SystemLogger.end_conversation(conversation_id, "failed")
 
-                # Create message with guidance
-                message = {
-                    'type': 'delegation',
-                    'content': guidance_content,  # Send the specialized guidance
-                    'correlation_id': correlation_id,
-                    'conversation_id': conversation_id,
-                    'source': 'atlas',
-                    'destination': branch,
-                    'context': {
-                        'original_query': conversation["query"],
-                        'atlas_analysis': conversation["initial_analysis"]
-                    }
-                }
-
-                # Log delegation
-                await SystemLogger.log_message(
-                    conversation_id=conversation_id,
-                    message_type="delegation",
-                    source="atlas",
-                    destination=branch,
-                    content=guidance_content,
-                    correlation_id=correlation_id,
-                    context={
-                        'original_query': conversation["query"],
-                        'atlas_analysis': conversation["initial_analysis"]
-                    }
-                )
-
-                await self.messaging.publish(f"{branch}_queue", message)
-                logger.info(f"Delegated to {branch} branch with specialized guidance")
-
-            except Exception as e:
-                logger.error(f"Error delegating to {branch}: {e}")
-
-    async def _collect_branch_responses(
-        self,
-        correlation_id: str,
-        timeout: int = 240
-    ) -> Dict[str, str]:
-        """Wait for and collect responses from branches"""
-        start_time = asyncio.get_event_loop().time()
-        conversation = self.conversations[correlation_id]
-        
-        while (asyncio.get_event_loop().time() - start_time) < timeout:
-            if len(conversation["branch_responses"]) >= 2:  # Both Nova and Sage
-                return conversation["branch_responses"]
-            await asyncio.sleep(1)
-
-        logger.warning(f"Timeout waiting for branch responses: {correlation_id}")
-        return conversation["branch_responses"]
-
-    async def _synthesize_responses(self, correlation_id: str) -> str:
-        """Generate final synthesis of all perspectives"""
-        conversation = self.conversations[correlation_id]
-        
-        # Prepare reflections for synthesis
-        reflection_insights = [
-            r["reflection"] + "\n\nCritique: " + r["critique"]
-            for r in conversation["reflections"]
-        ]
-
-        # Generate final synthesis
-        final_analysis = await self.query_model(
-            self.prompts.final_synthesis(
-                conversation["query"],
-                conversation["initial_analysis"],
-                conversation["branch_responses"].get("nova", "No response from Nova"),
-                conversation["branch_responses"].get("sage", "No response from Sage"),
-                reflection_insights
-            )
-        )
-
-        return final_analysis["choices"][0]["message"]["content"]
-
-    async def process_message(self, message_data: Dict[str, Any]):
-        """Process messages from branches"""
+    async def _handle_error(self, message: Message):
+        """Handle error from Nova or Sage"""
         try:
-            message = Message(**message_data)
-            logger.info(f"Received message from {message.source}")
-
             conversation = self.conversations.get(message.correlation_id)
             if conversation:
-                conversation["branch_responses"][message.source] = message.content
-            else:
-                logger.warning(f"No conversation found for correlation_id: {message.correlation_id}")
-
+                # Store error as branch response
+                conversation["branch_responses"][message.source] = f"Error: {message.content}"
+                
+                # If we have both responses (including errors), synthesize and respond
+                if len(conversation["branch_responses"]) == 2:
+                    await self._handle_response(message)
+            
         except Exception as e:
-            logger.error(f"Error processing message: {e}")
-
-    async def _cleanup_conversation(self, correlation_id: str):
-        """Cleanup conversation data"""
-        try:
-            del self.conversations[correlation_id]
-        except KeyError:
-            pass
+            logger.error(f"Error handling error message: {e}")
+            if conversation:
+                await SystemLogger.end_conversation(
+                    conversation["conversation_id"],
+                    "failed"
+                )
 
 if __name__ == "__main__":
     service = AtlasService()

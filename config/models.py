@@ -5,11 +5,30 @@ from pydantic import BaseModel, ConfigDict
 class ModelParameters(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
     
-    name: str = "phi-3"  # Simplified name, we'll construct the full path in query
+    name: str = "phi-3"
     slot: Optional[int] = None
     temperature: float = 0.7
-    max_tokens: int = 4096
+    max_tokens: int = 512      # Output length
+    context_length: int = 8192  # Plenty of room for input + responses
     top_p: float = 0.9
+
+    # Service-specific configurations
+    @classmethod
+    def for_service(cls, service_name: str) -> 'ModelParameters':
+        """Get configuration tailored to specific service needs"""
+        base_config = cls()
+        
+        if service_name == 'nova' or service_name == 'sage':
+            # Branch coordinators need more context
+            base_config.context_length = 8192
+        elif service_name == 'atlas':
+            # Atlas needs most context as it synthesizes everything
+            base_config.context_length = 16384
+        else:
+            # Leaf services (Echo, Pixel, Quantum) need less
+            base_config.context_length = 4096
+            
+        return base_config
 
 class ModelConfig(BaseModel):
     base_url: str
