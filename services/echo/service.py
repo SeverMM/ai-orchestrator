@@ -8,11 +8,13 @@ from core.utils.logging import setup_logger
 from core.logging.system_logger import SystemLogger
 from core.messaging.types import MessageType, Message
 from services.echo.prompts import EchoPrompts
+from core.validation import MessageValidator
 
 logger = setup_logger("echo")
 
 class EchoService(BaseService):
-    def __init__(self):
+    def __init__(self, template: ServiceTemplate):
+        self.validator = MessageValidator()
         super().__init__(SERVICE_TEMPLATES["echo"])
         self.prompts = EchoPrompts()
         self.reflection_depth = 2
@@ -87,6 +89,16 @@ class EchoService(BaseService):
             logger.error(f"Error in delegation handling: {e}")
             await self._send_error_response(str(e), message)
 
+    async def publish_message(self, queue: str, message: Dict[str, Any]):
+        """Publish message with validation"""
+        if not self.validator.validate_message_structure(message):
+            raise ValueError("Invalid message structure")
+            
+        if not self.validator.validate_message_content(message['content']):
+            raise ValueError("Invalid message content")
+            
+        await self.messaging.publish(queue, message)
+
     async def _send_error_response(self, error: str, original_message: Message):
         """Send error response to Nova"""
         try:
@@ -116,8 +128,9 @@ class EchoService(BaseService):
             logger.error(f"Error sending error response: {e}")
 
 if __name__ == "__main__":
-    service = EchoService()
     try:
+        from config.services import SERVICE_TEMPLATES
+        service = EchoService(template=SERVICE_TEMPLATES["echo"])
         asyncio.run(service.start())
     except KeyboardInterrupt:
         print("\nShutting down Echo service...")

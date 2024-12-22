@@ -8,12 +8,14 @@ from config.services import SERVICE_TEMPLATES
 from core.utils.logging import setup_logger
 from core.logging.system_logger import SystemLogger
 from core.messaging.types import MessageType, Message
+from core.validation import MessageValidator
 from services.atlas.prompts import AtlasPrompts
 
 logger = setup_logger("atlas")
 
 class AtlasService(BaseService):
-    def __init__(self):
+    def __init__(self, template: ServiceTemplate):
+        self.validator = MessageValidator()
         super().__init__(SERVICE_TEMPLATES["atlas"])
         self.prompts = AtlasPrompts()
         self.reflection_depth = 2
@@ -208,6 +210,16 @@ class AtlasService(BaseService):
             if conversation_id:
                 await SystemLogger.end_conversation(conversation_id, "failed")
 
+    async def publish_message(self, queue: str, message: Dict[str, Any]):
+        """Publish message with validation"""
+        if not self.validator.validate_message_structure(message):
+            raise ValueError("Invalid message structure")
+            
+        if not self.validator.validate_message_content(message['content']):
+            raise ValueError("Invalid message content")
+            
+        await self.messaging.publish(queue, message)
+
     async def _handle_error(self, message: Message):
         """Handle error from Nova or Sage"""
         try:
@@ -229,8 +241,10 @@ class AtlasService(BaseService):
                 )
 
 if __name__ == "__main__":
-    service = AtlasService()
     try:
+        from config.services import SERVICE_TEMPLATES
+        
+        service = AtlasService(template=SERVICE_TEMPLATES["atlas"])
         asyncio.run(service.start())
     except KeyboardInterrupt:
         print("\nShutting down Atlas service...")

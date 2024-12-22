@@ -9,7 +9,7 @@ async def test_query():
             print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Sending query to Atlas...")
             response = await client.post(
                 'http://localhost:8000/query',
-                json={'content': 'What is a dimension?'}
+                json={'content': 'What is a machine?'}
             )
             
             print("\nStatus Code:", response.status_code)

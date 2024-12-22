@@ -8,11 +8,13 @@ from core.utils.logging import setup_logger
 from core.logging.system_logger import SystemLogger
 from core.messaging.types import MessageType, Message
 from services.sage.prompts import SagePrompts
+from core.validation import MessageValidator
 
 logger = setup_logger("sage")
 
 class SageService(BaseService):
-    def __init__(self):
+    def __init__(self, template: ServiceTemplate):
+        self.validator = MessageValidator()
         super().__init__(SERVICE_TEMPLATES["sage"])
         self.prompts = SagePrompts()
         self.pending_responses = {}
@@ -155,30 +157,40 @@ class SageService(BaseService):
     async def _delegate_to_quantum(self, query: str, sage_analysis: str, correlation_id: str, conversation_id: int):
         """Delegate to Quantum for deeper insights"""
         try:
+            # Send Sage's analysis, not the original query
+            message_content = sage_analysis  # Changed from query to sage_analysis
+            
             # Log delegation
             await SystemLogger.log_message(
                 conversation_id=conversation_id,
                 message_type='delegation',
                 source="sage",
                 destination="quantum",
-                content=query,
+                content=message_content,
                 correlation_id=correlation_id,
-                context={"sage_analysis": sage_analysis}
+                context={
+                    "sage_analysis": sage_analysis,
+                    "instruction": "Analyze these philosophical insights for deeper metaphysical implications and emergent properties"
+                }
             )
-            
-            # Send to Quantum
+        
             await self.messaging.publish(
                 "quantum_queue",
                 Message(
                     type=MessageType.DELEGATION,
-                    content=query,
+                    content=message_content,
                     correlation_id=correlation_id,
                     source="sage",
                     destination="quantum",
                     conversation_id=conversation_id,
-                    context={"sage_analysis": sage_analysis}
+                    context={
+                        "sage_analysis": sage_analysis,
+                        "instruction": "Analyze these philosophical insights for deeper metaphysical implications and emergent properties"
+                    }
                 ).dict()
             )
+        
+            logger.info("Delegated to Quantum with philosophical analysis")
             
         except Exception as e:
             logger.error(f"Error delegating to Quantum: {e}")
@@ -203,6 +215,16 @@ class SageService(BaseService):
                 del self.pending_responses[message.correlation_id]
         except Exception as e:
             logger.error(f"Error handling error message: {e}")
+
+    async def publish_message(self, queue: str, message: Dict[str, Any]):
+        """Publish message with validation"""
+        if not self.validator.validate_message_structure(message):
+            raise ValueError("Invalid message structure")
+            
+        if not self.validator.validate_message_content(message['content']):
+            raise ValueError("Invalid message content")
+            
+        await self.messaging.publish(queue, message)
 
     async def _send_error_response(self, error: str, original_message: Message):
         """Send error response to Atlas"""
@@ -234,8 +256,9 @@ class SageService(BaseService):
             logger.error(f"Error sending error response: {e}")  
 
 if __name__ == "__main__":
-    service = SageService()
     try:
+        from config.services import SERVICE_TEMPLATES
+        service = SageService(template=SERVICE_TEMPLATES["sage"])
         asyncio.run(service.start())
     except KeyboardInterrupt:
         print("\nShutting down Sage service...")
