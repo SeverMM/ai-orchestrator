@@ -1,6 +1,6 @@
 [alembic]
 script_location = migrations
-sqlalchemy.url = postgresql+asyncpg://postgres:postgres@localhost:5432/ai_orchestrator
+sqlalchemy.url = postgresql+asyncpg://None:None@None:None/None
 
 [loggers]
 keys = root,sqlalchemy,alembic

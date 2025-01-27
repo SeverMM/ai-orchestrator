@@ -37,10 +37,15 @@ class ServiceManager:
 
     async def check_port(self, port: int) -> bool:
         """Check if a port is in use"""
-        for conn in psutil.net_connections():
-            if conn.laddr.port == port:
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(('localhost', port))
+                s.listen(1)
+                s.close()
+                return False
+            except OSError:
                 return True
-        return False
 
     async def check_service_health(self, port: int) -> bool:
         """Check if a service is healthy"""
