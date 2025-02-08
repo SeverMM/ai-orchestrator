@@ -1,0 +1,15 @@
+Metadata-Version: 2.2
+Name: ai_orchestrator
+Version: 0.1
+Requires-Dist: fastapi>=0.104.1
+Requires-Dist: uvicorn>=0.24.0
+Requires-Dist: httpx>=0.25.2
+Requires-Dist: aio-pika>=9.3.0
+Requires-Dist: pydantic>=2.5.2
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: PyYAML>=6.0.1
+Requires-Dist: alembic>=1.7.7
+Requires-Dist: asyncpg>=0.25.0
+Requires-Dist: SQLAlchemy>=1.4.36
+Requires-Dist: psycopg2-binary>=2.9.3
+Dynamic: requires-dist

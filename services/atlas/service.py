@@ -2,7 +2,7 @@ import asyncio
 from typing import Dict, Any, Optional
 import time
 from fastapi import FastAPI, HTTPException
-from core.services.base import BaseService
+from ai_orchestrator.core.services.base import BaseService
 from core.templates import ServiceTemplate
 from config.services import SERVICE_TEMPLATES
 from core.utils.logging import setup_logger
@@ -10,6 +10,9 @@ from core.logging.system_logger import SystemLogger
 from core.messaging.types import MessageType, Message
 from core.validation import MessageValidator
 from services.atlas.prompts import AtlasPrompts
+
+PROJECT_ROOT = Path(__file__).parent.parent.parent  # C:\ai-orchestrator
+sys.path.append(str(PROJECT_ROOT))
 
 logger = setup_logger("atlas")
 
