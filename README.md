@@ -1,6 +1,6 @@
 # AI Orchestrator
 
-A sophisticated AI orchestration system that coordinates multiple specialized AI agents for comprehensive query processing.
+An AI orchestration system that coordinates multiple specialized AI agents for comprehensive query processing.
 
 ## Architecture
 
