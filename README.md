@@ -4,56 +4,60 @@ A sophisticated AI orchestration system that coordinates multiple specialized AI
 
 ## Architecture
 
+The AI Orchestrator implements a hierarchical thinking system with the following structure:
+
 - **Atlas Service**: Central coordinator that delegates to specialized services
-- **Nova Service**: Technical analysis specialist
-- **Echo Service**: Implementation details specialist
-- **Sage Service**: Additional perspective provider
-- **Pixel Service**: Pattern recognition specialist
-- **Quantum Service**: Advanced reasoning specialist
+  - **Nova Service**: Technical analysis branch that delegates to:
+    - **Echo Service**: Pattern recognition specialist
+    - **Pixel Service**: Creative visualization specialist
+  - **Sage Service**: Philosophical analysis branch that delegates to:
+    - **Quantum Service**: Probabilistic reasoning specialist
+
+Each service implements a 4-step thinking process:
+1. Analysis - Initial domain-specific assessment
+2. Reflection - Deeper consideration of the analysis
+3. Critique - Critical examination of thinking
+4. Integration - Synthesis of insights
+
+## Key Features
+
+- **Hierarchical Delegation**: Distributes cognitive tasks across specialized services
+- **Multi-Step Thinking**: Each service performs multi-stage analysis for deeper insights
+- **Context Propagation**: Parent services pass their analysis to child services
+- **Rate Limiting**: Smart timing strategy prevents LLM overload
+- **Comprehensive Logging**: Detailed tracking of message flow and thinking process
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 16+ and npm
 - Python 3.9+
-- NVIDIA GPU with appropriate drivers (for local LLM inference)
+- LM Studio (for local LLM inference)
+- RabbitMQ (for message passing between services)
 
-### Running the Frontend
+### Running the Services
 
-1. Install dependencies:
+Use the provided script to start all services:
+
 ```bash
-npm install
-```
+# Windows
+start_services.bat
 
-2. Start the development server:
-```bash
-npm run dev
-```
-
-3. Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Running the Backend
-
-1. Start the Atlas service:
-```bash
+# Linux/Mac (run each in a separate terminal)
 python -m services.atlas.service
-```
-
-2. Start other services as needed:
-```bash
 python -m services.nova.service
-python -m services.echo.service
 python -m services.sage.service
+python -m services.echo.service
 python -m services.pixel.service
 python -m services.quantum.service
 ```
 
-## API Endpoints
+## Documentation
 
-- **POST /query**: Submit a query to the orchestration system
-- **GET /status/{correlation_id}**: Check the status of a submitted query
-- **GET /health**: Check if the service is healthy
+For more detailed information, see:
+
+- [Full Documentation](DOCUMENTATION.md) - Comprehensive system documentation
+- [Developer Guide](DEVELOPER_GUIDE.md) - Quick start guide for developers
 
 ## Project Structure
 
@@ -61,6 +65,30 @@ python -m services.quantum.service
 - `/core`: Shared core functionality
 - `/database`: Database models and connection
 - `/config`: Configuration for services and models
-- `/pages`: Frontend pages
-- `/components`: Frontend UI components
-- `/styles`: CSS and styling
+
+## API Endpoints
+
+Each service exposes:
+
+- **GET /health**: Check if the service is healthy
+- **GET /status**: Get service capabilities and status
+
+Atlas additionally provides:
+
+- **POST /query**: Submit a query to the orchestration system
+- **GET /status/{correlation_id}**: Check the status of a submitted query
+
+## Recent Improvements
+
+1. **Timing Strategy**: Implemented deliberate delays to prevent LLM overload and create natural thinking flow
+2. **Context Enrichment**: Enhanced parent analysis sharing with child services
+3. **Error Handling**: Standardized error handling across all services
+4. **Code Optimization**: Consolidated common functionality in base classes
+
+## Contributing
+
+Contributions are welcome! See the developer guide for details on how to extend the system.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
