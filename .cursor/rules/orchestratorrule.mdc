@@ -1,0 +1,20 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# AI Orchestrator Project Rules
+
+## Overall Architecture
+- This project uses a multi-LLM architecture (Atlas, Nova, Sage, etc.). Code should respect the defined roles and communication patterns between services.
+- Maintain consistency with the project's established logging practices and database schema (`Message`, `ProcessingMetrics` models).
+
+## Prompt Engineering (`*prompts.py` files)
+- Focus on crafting clear, concise, and unambiguous instructions for the target LLM.
+- Ensure prompts explicitly define the expected role, context, and desired output format (e.g., JSON, specific number of sentences).
+- When suggesting prompt changes, explain how the change is expected to alter the LLM's behavior or output.
+
+## Service Logic (`*_service.py` files)
+- Ensure robust error handling for external calls: use try-except blocks for `httpx` requests (catching `httpx.RequestError`, `httpx.ReadTimeout`) and for LLM API interactions.
+- When interacting with the database (using SQLAlchemy), ensure data conforms to the defined schema and use session management correctly.
+- Handle API keys and sensitive configuration securely. Avoid hardcoding secrets; refer to environment variables or configuration management practices.

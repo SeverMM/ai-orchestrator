@@ -25,11 +25,11 @@ class ServiceManager:
     def __init__(self):
         self.services = {
             'atlas': {'port': 8000, 'dependencies': []},
-            'nova': {'port': 8001, 'dependencies': ['atlas']},
-            'sage': {'port': 8004, 'dependencies': ['atlas']},
-            'echo': {'port': 8002, 'dependencies': ['nova']},
-            'pixel': {'port': 8003, 'dependencies': ['nova']},
-            'quantum': {'port': 8005, 'dependencies': ['sage']}
+            'nova': {'port': 8100, 'dependencies': ['atlas']},
+            'sage': {'port': 8200, 'dependencies': ['atlas']},
+            'echo': {'port': 8300, 'dependencies': ['nova']},
+            'pixel': {'port': 8400, 'dependencies': ['nova']},
+            'quantum': {'port': 8500, 'dependencies': ['sage']}
         }
         self.processes = {}
         self.max_retries = 30

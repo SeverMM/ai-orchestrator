@@ -1,0 +1,5 @@
+$body = @{
+    content = "What is a thread?"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:8000/query" -Method Post -Body $body -ContentType "application/json"

@@ -43,11 +43,11 @@ SYSTEM_CONFIG = {
 # Service ports
 SERVICE_PORTS = {
     'atlas': int(os.getenv('ATLAS_PORT', 8000)),
-    'nova': int(os.getenv('NOVA_PORT', 8001)),
-    'echo': int(os.getenv('ECHO_PORT', 8002)),
-    'pixel': int(os.getenv('PIXEL_PORT', 8003)),
-    'sage': int(os.getenv('SAGE_PORT', 8004)),
-    'quantum': int(os.getenv('QUANTUM_PORT', 8005))
+    'nova': int(os.getenv('NOVA_PORT', 8100)),
+    'echo': int(os.getenv('ECHO_PORT', 8200)),
+    'pixel': int(os.getenv('PIXEL_PORT', 8300)),
+    'sage': int(os.getenv('SAGE_PORT', 8400)),
+    'quantum': int(os.getenv('QUANTUM_PORT', 8500))
 }
 
 # Model configurations

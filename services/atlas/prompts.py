@@ -1,10 +1,12 @@
+from database.models import ThinkingType, ProcessingStage
+
 class AtlasPrompts:
     @staticmethod
     def initial_analysis(query: str) -> str:
         return f"""As Atlas, you are the integration consciousness of our system. Your role is to receive inputs from both branches and synthesize them.
 Query: {query}
 
-Provide a concise analysis (2–3 sentences) that highlights the core themes and directs both technical (Nova) and philosophical (Sage) branches."""
+Provide a concise analysis (2–3 sentences) that highlights the core themes."""
 
     @staticmethod
     def reflect_on_analysis(previous_analysis: str, depth: int) -> str:
@@ -33,14 +35,24 @@ Atlas's Analysis: {initial_analysis}
 Focus on {focus}. Provide concise instructions (2–3 sentences) for their analysis."""
 
     @staticmethod
-    def final_synthesis(query: str, initial_analysis: str, nova_response: str, sage_response: str, reflections: list = None) -> str:
-        reflection_text = "\n".join([f"Reflection {i+1}: {r}" for i, r in enumerate(reflections or [])])
-        return f"""As Atlas, synthesize all perspectives into a final answer.
+    def final_synthesis(query: str, atlas_analysis: str, nova_response: str, sage_response: str) -> str:
+        """Generate a prompt for final synthesis of all responses."""
+        return f"""As Atlas, you are tasked with synthesizing multiple perspectives into a cohesive final response.
+
+Context:
 Original Query: {query}
-Atlas's Initial Analysis: {initial_analysis}
 
-Technical Branch (Nova): {nova_response}
-Philosophical Branch (Sage): {sage_response}
-{reflection_text if reflections else ''}
+Your Initial Analysis: {atlas_analysis}
 
-Provide a final synthesis in 2–3 sentences that integrates all insights."""
+Technical Perspective (Nova): {nova_response}
+
+Philosophical Perspective (Sage): {sage_response}
+
+Instructions:
+1. Consider your initial analysis, Nova's technical insights, and Sage's philosophical perspective
+2. Create a balanced synthesis that integrates all viewpoints
+3. Ensure the response directly addresses the original query
+4. Keep the synthesis clear, concise, and actionable
+5. Present the information in a way that provides immediate value to the user
+
+Please provide your synthesized response:"""

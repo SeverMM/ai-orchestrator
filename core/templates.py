@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional, Any
 from pydantic import BaseModel
 from enum import Enum
+from core.types import ServiceType, ServiceCapability
 
 class ServiceType(str, Enum):
     COORDINATOR = "coordinator"
@@ -15,42 +16,44 @@ class ServiceCapability(str, Enum):
     COORDINATE = "coordinate"
 
 class ServiceConfig(BaseModel):
-    """Base configuration for all services"""
+    """Configuration for a service instance"""
     name: str
     type: ServiceType
     model_name: str
+    host: str
+    port: int
+    debug: bool
     capabilities: List[ServiceCapability]
     processing_pattern: str
-    port: int
-    parent: Optional[str] = None
-    children: List[str] = []
-    
+
 class ModelConfig(BaseModel):
-    """LLM configuration"""
+    """Configuration for the language model used by a service"""
     name: str
+    model_name: str
     endpoint: str
+    base_url: str
+    max_tokens: int
+    temperature: float
     context_window: int
-    parameters: Dict[str, Any] = {}
+    system_prompt: str
+    response_format: dict
 
 class MessagingConfig(BaseModel):
-    """Messaging configuration"""
+    """Configuration for the messaging system used by a service"""
+    broker_url: str
+    exchange: str
+    queue_prefix: str
     queue_name: str
-    parent_queue: Optional[str]
-    child_queues: List[str] = []
-    retry_attempts: int = 3
-    timeout: int = 30
+    parent_queue: str
 
-class ServiceTemplate:
-    """Template for service initialization"""
-    def __init__(
-        self,
-        service_config: ServiceConfig,
-        model_config: ModelConfig,
-        messaging_config: MessagingConfig
-    ):
-        self.service_config = service_config
-        self.model_config = model_config
-        self.messaging_config = messaging_config
+class ServiceTemplate(BaseModel):
+    """Template for creating service instances"""
+    service_config: ServiceConfig
+    llm_config: ModelConfig
+    messaging_config: MessagingConfig
+    description: str
+    branch_services: Optional[List[str]] = None
+    capabilities: List[str]
 
     @classmethod
     def create_coordinator(cls, name: str, port: int) -> 'ServiceTemplate':
@@ -69,7 +72,7 @@ class ServiceTemplate:
                 processing_pattern="standard",
                 port=port
             ),
-            model_config=ModelConfig(
+            llm_config=ModelConfig(
                 name="phi-3",
                 endpoint="http://localhost:1234/v1/chat/completions",
                 context_window=2048
@@ -98,7 +101,7 @@ class ServiceTemplate:
                 port=port,
                 parent=parent
             ),
-            model_config=ModelConfig(
+            llm_config=ModelConfig(
                 name="phi-3",
                 endpoint="http://localhost:1234/v1/chat/completions",
                 context_window=2048
@@ -126,7 +129,7 @@ class ServiceTemplate:
                 port=port,
                 parent=parent
             ),
-            model_config=ModelConfig(
+            llm_config=ModelConfig(
                 name="phi-3",
                 endpoint="http://localhost:1234/v1/chat/completions",
                 context_window=2048

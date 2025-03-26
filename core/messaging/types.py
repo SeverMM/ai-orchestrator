@@ -1,36 +1,38 @@
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
 
 class MessageType(str, Enum):
-    # Basic message flow
-    DELEGATION = "delegation"    # Parent delegating to child
-    RESPONSE = "response"        # Child responding to parent
-    QUERY = "query"             # Initial user query
+    # Core thinking operations
+    ANALYZE = "analyze"         # Initial analysis of input
+    REFLECT = "reflect"         # Deeper consideration of analysis
+    CRITIQUE = "critique"       # Critical examination
+    INTEGRATE = "integrate"     # Combining thoughts
+    DELEGATE = "delegate"       # Task delegation
+    RESPOND = "respond"         # Response to parent
+    SYNTHESIZE = "synthesize"   # Combining responses
     
-    # Cognitive operations
-    REFLECTION = "reflection"    # Think about previous thinking
-    ITERATION = "iteration"      # Multiple exchanges
-    SYNTHESIS = "synthesis"      # Combine multiple thoughts
-    CRITIQUE = "critique"        # Critical analysis of previous thought
-    EXPANSION = "expansion"      # Expand on a specific aspect
+    # System operations
+    QUERY = "query"            # Initial user query
+    STATUS = "status"          # Status updates
+    ERROR = "error"            # Error messages
     
     # Meta operations
-    STATUS = "status"           # Process status updates
-    ERROR = "error"             # Error messages
-    CONTROL = "control"         # Flow control messages
+    CONTROL = "control"        # Flow control messages
+    METRICS = "metrics"        # Performance metrics
 
 class Message(BaseModel):
+    """Standard message format for all service communication"""
     type: MessageType
     content: str
     correlation_id: str
     source: str
     destination: str
-    iteration: int = 1
     conversation_id: Optional[int] = None
     context: Dict[str, Any] = {}
     
-    # For reflection/iteration chains
+    # Optional fields for advanced processing
+    iteration: int = 1
     previous_response: Optional[str] = None
     reflection_depth: int = 0
-    thinking_pattern: Optional[str] = None  # e.g., "analyze->reflect->synthesize"
+    thinking_chain: Optional[List[str]] = None

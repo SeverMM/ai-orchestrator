@@ -1,11 +1,42 @@
 class NovaPrompts:
-    @staticmethod
-    def technical_analysis(query: str, atlas_analysis: str) -> str:
-        return f"""As Nova, you lead the technical branch. Your role is to analyze structural and systematic aspects.
-Original Query: {query}
-Atlas's Analysis: {atlas_analysis}
+    """Prompts for Nova technical analysis service"""
+    
+    def technical_analysis(self, content: str, atlas_analysis: str = None) -> str:
+        """Generate prompt for technical analysis"""
+        if atlas_analysis:
+            return f"""As Nova, I specialize in technical analysis. I've received the following query:
+{content}
 
-Provide a concise technical analysis (2–3 sentences) focusing on key systems, patterns, and dependencies."""
+Atlas has provided this initial analysis:
+{atlas_analysis}
+
+In 2-3 sentences, provide a focused technical analysis that covers the key technical concepts, principles, and practical applications."""
+        else:
+            return f"""As Nova, I specialize in technical analysis. I've received the following query:
+{content}
+
+In 2-3 sentences, provide a focused technical analysis that covers the key technical concepts, principles, and practical applications."""
+
+    def technical_reflection(self, content: str) -> str:
+        """Generate prompt for technical reflection"""
+        return f"""Based on the previous technical analysis:
+{content}
+
+In 2-3 sentences, reflect on the key technical insights and potential limitations or challenges."""
+
+    def technical_critique(self, content: str) -> str:
+        """Generate prompt for technical critique"""
+        return f"""Based on the previous reflection:
+{content}
+
+In 2-3 sentences, provide a constructive technical critique focusing on completeness, feasibility, and potential risks."""
+
+    def technical_integration(self, content: str) -> str:
+        """Generate prompt for technical integration"""
+        return f"""Based on the previous analysis, reflection, and critique:
+{content}
+
+In 2-3 sentences, provide an integrated technical perspective that synthesizes the key findings and suggests next steps."""
 
     @staticmethod
     def reflect_on_analysis(previous_analysis: str, depth: int) -> str:

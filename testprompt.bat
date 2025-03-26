@@ -1,1 +1,0 @@
-Invoke-WebRequest -Uri http://localhost:8000/query -Method POST -Headers @{ "Content-Type" = "application/json" } -Body '{"content": "What is the meaning of work/life balance?"}'
